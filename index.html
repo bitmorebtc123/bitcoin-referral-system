@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-gray-100">
+<head>
+  <meta charset="UTF-8">
+  <title>Bitcoin Referral Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-4">
+  <div class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">BTC Referral System</h1>
+
+    <!-- Signup/Login -->
+    <div id="auth-section">
+      <input id="email" type="email" placeholder="Email" class="w-full p-2 mb-2 border rounded">
+      <input id="password" type="password" placeholder="Password" class="w-full p-2 mb-2 border rounded">
+      <input id="wallet" type="text" placeholder="BTC Wallet Address" class="w-full p-2 mb-2 border rounded">
+      <input id="referral" type="text" placeholder="Referral Code (optional)" class="w-full p-2 mb-2 border rounded">
+      <button onclick="signup()" class="bg-green-600 text-white w-full py-2 rounded mb-2">Sign Up</button>
+      <button onclick="login()" class="bg-blue-600 text-white w-full py-2 rounded">Log In</button>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden">
+      <p class="text-center text-sm text-gray-500 mb-2">User ID: <span id="userIdDisplay" class="font-mono text-xs"></span></p>
+      
+      <div class="bg-gray-100 p-3 rounded mb-3">
+        <p>Balance: <strong id="balance">0.0000 BTC</strong></p>
+        <p>BTC/USD: <span id="btcPrice">$0.00</span></p>
+      </div>
+
+      <button onclick="invest()" class="bg-yellow-500 text-white w-full py-2 rounded mb-2">Invest 0.0003 BTC</button>
+      <input id="withdrawAmount" type="number" step="0.0001" placeholder="Withdraw Amount (BTC)" class="w-full p-2 mb-2 border rounded">
+      <button onclick="withdraw()" class="bg-red-500 text-white w-full py-2 rounded mb-4">Withdraw</button>
+
+      <div>
+        <h2 class="font-semibold mb-2">Transaction History:</h2>
+        <ul id="history" class="text-sm space-y-1"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:5000";
+    let userId = "";
+
+    function signup() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const wallet = document.getElementById("wallet").value;
+      const referred_by = document.getElementById("referral").value;
+
+      fetch(`${API}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, btc_wallet: wallet, referred_by })
+      })
+      .then(res => res.json())
+      .then(data => {
+        userId = data.user_id;
+        showDashboard();
+      });
+    }
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      fetch(`${API}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.user_id) {
+          userId = data.user_id;
+          showDashboard();
+        } else {
+          alert("Invalid credentials");
+        }
+      });
+    }
+
+    function showDashboard() {
+      document.getElementById("auth-section").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      document.getElementById("userIdDisplay").textContent = userId;
+      updateDashboard();
+    }
+
+    function updateDashboard() {
+      fetch(`${API}/btc-price`).then(res => res.json()).then(data => {
+        document.getElementById("btcPrice").textContent = `$${data.btc_usd}`;
+      });
+
+      fetch(`${API}/transactions/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        let balance = 0;
+        let html = "";
+        data.forEach(tx => {
+          balance += tx.amount;
+          html += `<li>${tx.type.toUpperCase()}: ${tx.amount} BTC - ${tx.timestamp}</li>`;
+        });
+        document.getElementById("history").innerHTML = html;
+        document.getElementById("balance").textContent = balance.toFixed(8) + " BTC";
+      });
+    }
+
+    function invest() {
+      fetch(`${API}/invest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId })
+      })
+      .then(res => res.json())
+      .then(() => {
+        updateDashboard();
+        alert("Investment Successful!");
+      });
+    }
+
+    function withdraw() {
+      const amount = document.getElementById("withdrawAmount").value;
+      fetch(`${API}/withdraw`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, amount })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        updateDashboard();
+      });
+    }
+  </script>
+</body>
+</html>
